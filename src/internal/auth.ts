@@ -1,5 +1,6 @@
 "use server";
 
+import axios from "axios";
 import { cookies } from "next/headers";
 
 export async function isUserLoggedIn(): Promise<boolean> {
@@ -54,4 +55,62 @@ export async function getGuidToken() {
   const guid = cookiesStore.get("guid");
   if (guid == undefined) throw new Error("Guid doesn't exists.");
   return guid.value;
+}
+
+export async function loginUser(credentials: {
+  username: string;
+  password: string;
+}) {
+  const reqPayload = {
+    username: credentials.username,
+    password: credentials.password,
+  };
+
+  const reqConfig = {
+    headers: { "Content-Type": "application/json" },
+    withCredentials: true,
+  };
+
+  try {
+    const res = await axios.post(
+      "https://dummyjson.com/auth/login",
+      reqPayload,
+      reqConfig,
+    );
+
+    if (res.status != 200) {
+      return false;
+    }
+
+    const cookieStore = await cookies();
+    cookieStore.set("accessToken", res.data.accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      path: "/",
+    });
+    cookieStore.set("refreshToken", res.data.refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      path: "/",
+    });
+    cookieStore.set("guid", crypto.randomUUID(), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      path: "/",
+    });
+  } catch (error) {
+    return false;
+  }
+
+  return true;
+}
+
+export async function logoutUser() {
+  const cookieStore = await cookies();
+  cookieStore.delete("accessToken");
+  cookieStore.delete("refreshToken");
+  cookieStore.delete("guid");
 }
